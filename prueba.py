@@ -237,4 +237,48 @@ if not serie.empty:
 else:
     st.warning("No se pudo construir la serie de muertes para este rango de fechas.")
 
+# ———————————————————————————————————————————————
+# 4 Gráfico 
+# ———————————————————————————————————————————————
+# --- 4. Segmentación y reducción de dimensionalidad ---
 
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+
+# Seleccionamos las variables relevantes para clustering
+X = df[['tasa_recuperacion', 'tasa_mortalidad', 'CFR', 'crecimiento_7d']].dropna()
+
+# Estandarización (muy importante para clustering)
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# 4.1 Clustering con KMeans
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+clusters = kmeans.fit_predict(X_scaled)
+
+df.loc[X.index, 'cluster'] = clusters
+
+# 4.2 Reducción de dimensionalidad con PCA
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+df.loc[X.index, 'PC1'] = X_pca[:, 0]
+df.loc[X.index, 'PC2'] = X_pca[:, 1]
+
+# Graficamos los clústeres en el espacio PCA
+plt.figure(figsize=(8,6))
+sns.scatterplot(x='PC1', y='PC2', hue='cluster', data=df, palette='Set2', s=100, alpha=0.8)
+for i, pais in enumerate(df.loc[X.index, 'pais']):
+    plt.text(df.loc[X.index, 'PC1'].iloc[i]+0.05, df.loc[X.index, 'PC2'].iloc[i]+0.05, pais, fontsize=8)
+
+plt.title("Clustering de países (PCA 2D)")
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.legend(title="Cluster")
+plt.show()
+
+# 4.3 Interpretación básica de perfiles de clúster
+cluster_profiles = df.groupby('cluster')[['tasa_recuperacion','tasa_mortalidad','CFR','crecimiento_7d']].mean()
+print("Perfiles promedio por clúster:")
+print(cluster_profiles)
