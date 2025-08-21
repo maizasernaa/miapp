@@ -132,3 +132,74 @@ agg_country["CFR"] = agg_country[D] / agg_country[C]
 agg_country["Tasa_100k"] = (agg_country[D] / (agg_country[C] + 1)) * 100000
 
 st.dataframe(agg_country.head(20))
+
+# ———————————————————————————————————————————————
+# 2.2. Intervalos de confianza para CFR
+# ———————————————————————————————————————————————
+st.header("2.2 Intervalos de confianza (95%) del CFR")
+
+def ci_cfr(deaths, confirmed, alpha=0.05):
+    if confirmed == 0: return (0, 0)
+    p = deaths / confirmed
+    se = np.sqrt(p*(1-p)/confirmed)
+    z = 1.96  # 95%
+    return (p - z*se, p + z*se)
+
+agg_country["CFR_IC"] = agg_country.apply(lambda row: ci_cfr(row[D], row[C]), axis=1)
+
+st.dataframe(agg_country.head(20))
+
+from statsmodels.stats.proportion import proportions_ztest
+
+st.header("2.3 Test de hipótesis de CFR entre dos países")
+
+paises = st.multiselect("Selecciona dos países", agg_country.index.tolist(), default=["Peru","Chile"])
+if len(paises) == 2:
+    deaths = [agg_country.loc[p, D] for p in paises]
+    confirmed = [agg_country.loc[p, C] for p in paises]
+    
+    stat, pval = proportions_ztest(deaths, confirmed)
+    st.write(f"Estadístico Z: {stat:.3f}, p-valor: {pval:.4f}")
+    if pval < 0.05:
+        st.success("Se rechaza H0: Hay diferencia significativa en CFR.")
+    else:
+        st.info("No se rechaza H0: No hay diferencia significativa en CFR.")
+
+# ———————————————————————————————————————————————
+# 2.4 Detección de outliers
+# ———————————————————————————————————————————————
+st.header("2.4 Outliers en fallecidos (Z-score)")
+
+muertes_pais = df.groupby(country_col)[D].sum(numeric_only=True)
+z_scores = (muertes_pais - muertes_pais.mean())/muertes_pais.std()
+outliers = muertes_pais[z_scores > 3]
+
+st.write("Outliers detectados (Z > 3):")
+st.dataframe(outliers)
+
+# ———————————————————————————————————————————————
+# 2.5 Gráfico de control (3σ) de muertes diarias
+# ———————————————————————————————————————————————
+st.header("2.5 Gráfico de control (3σ) – Muertes diarias globales")
+
+# Sumamos muertes globales por fecha
+fechas = pd.date_range("2020-03-01","2020-05-01") # ejemplo
+diario = []
+for f in fechas:
+    try:
+        df_tmp, _, cols_tmp = load_daily_report(f.strftime("%Y-%m-%d"))
+        diario.append([f, df_tmp[cols_tmp["deaths"]].sum()])
+    except:
+        pass
+serie = pd.DataFrame(diario, columns=["Fecha","Muertes"])
+
+media = serie["Muertes"].mean()
+sigma = serie["Muertes"].std()
+ucl = media + 3*sigma
+lcl = max(0, media - 3*sigma)
+
+st.line_chart(serie.set_index("Fecha"))
+
+st.write(f"Media: {media:.1f}, UCL (Límite superior 3σ): {ucl:.1f}, LCL: {lcl:.1f}")
+
+
