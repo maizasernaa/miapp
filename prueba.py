@@ -118,3 +118,17 @@ subset_plot = subset.head(25)
 # Streamlit no tiene boxplot nativo, así que mostramos estadísticas resumen en tabla
 st.write("Resumen estadístico (simulación de boxplot):")
 st.dataframe(subset_plot.describe().T)
+
+# ———————————————————————————————————————————————
+# 2.1. Estadística descriptiva: métricas por país
+# ———————————————————————————————————————————————
+st.header("2.1 Métricas clave por país")
+
+# Necesitamos Confirmed y Deaths
+agg_country = df.groupby(country_col)[[C, D]].sum(numeric_only=True)
+agg_country["CFR"] = agg_country[D] / agg_country[C]
+
+# Si tuvieras población, aquí podrías unirla. Por ahora simulamos con random:
+agg_country["Tasa_100k"] = (agg_country[D] / (agg_country[C] + 1)) * 100000
+
+st.dataframe(agg_country.head(20))
