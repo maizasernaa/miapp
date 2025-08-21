@@ -5,7 +5,7 @@ from io import StringIO
 import statsmodels
 from statsmodels.stats.proportion import proportions_ztest
 import altair as alt
-
+import matplotlib.pyplot as plt
 st.set_page_config(page_title="COVID-19 Viz – Pregunta 2", layout="wide")
 
 GITHUB_BASE = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports"
@@ -184,13 +184,14 @@ st.write("Outliers detectados (Z > 3):")
 st.dataframe(outliers)
 
 
+import matplotlib.pyplot as plt
+
 # ———————————————————————————————————————————————
 # 2.5 Gráfico de control (3σ) – Muertes diarias globales
 # ———————————————————————————————————————————————
 st.header("2.5 Gráfico de control (3σ) – Muertes diarias globales")
 
-# Construimos una serie temporal de muertes totales globales
-# (nota: aquí tomamos solo la fecha seleccionada +/- 30 días como ejemplo)
+# Rango de fechas (ejemplo: últimos 30 días respecto a la fecha seleccionada)
 rango_fechas = pd.date_range(pd.to_datetime(fecha) - pd.Timedelta(days=30),
                              pd.to_datetime(fecha))
 
@@ -210,35 +211,23 @@ if not serie.empty:
     ucl = media + 3*sigma
     lcl = max(0, media - 3*sigma)
 
-    # Chart con Altair
-    line = alt.Chart(serie).mark_line(point=True).encode(
-        x=alt.X("Fecha:T", title="Fecha"),
-        y=alt.Y("Muertes:Q", title="Muertes diarias"),
-        tooltip=["Fecha:T","Muertes:Q"]
-    ).properties(
-        width=800, height=400, title="Control Chart (3σ) – Muertes diarias"
-    )
+    fig, ax = plt.subplots(figsize=(10,5))
+    ax.plot(serie["Fecha"], serie["Muertes"], marker="o", label="Muertes diarias")
+    ax.axhline(media, color="blue", linestyle="--", linewidth=2, label=f"Media ({media:.0f})")
+    ax.axhline(ucl, color="red", linestyle="--", linewidth=2, label=f"UCL (+3σ={ucl:.0f})")
+    ax.axhline(lcl, color="green", linestyle="--", linewidth=2, label=f"LCL (-3σ={lcl:.0f})")
 
-    # Líneas de control
-    reglas = pd.DataFrame({
-        "label": ["Media", "UCL (+3σ)", "LCL (-3σ)"],
-        "valor": [media, ucl, lcl],
-        "color": ["blue", "red", "red"]
-    })
+    # resaltar puntos fuera de control
+    fuera_control = serie[(serie["Muertes"] > ucl) | (serie["Muertes"] < lcl)]
+    ax.scatter(fuera_control["Fecha"], fuera_control["Muertes"], color="red", s=80, zorder=5, label="Anomalías")
 
-    rules = alt.Chart(reglas).mark_rule(strokeDash=[5,5]).encode(
-        y="valor:Q",
-        color=alt.Color("color:N", scale=None),
-        tooltip=["label:N","valor:Q"]
-    )
+    ax.set_title("Gráfico de Control (3σ) de Muertes Diarias", fontsize=14)
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Muertes")
+    ax.legend()
+    ax.grid(True, linestyle="--", alpha=0.6)
 
-    text = alt.Chart(reglas).mark_text(align="left", dx=5).encode(
-        y="valor:Q",
-        text="label:N",
-        color="color:N"
-    )
-
-    st.altair_chart(line + rules + text, use_container_width=True)
+    st.pyplot(fig)
 
     st.write(f"Media: {media:.1f}, UCL (Límite superior 3σ): {ucl:.1f}, LCL: {lcl:.1f}")
 else:
