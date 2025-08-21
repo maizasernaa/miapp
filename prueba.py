@@ -4,6 +4,8 @@ import numpy as np
 from io import StringIO
 import statsmodels
 from statsmodels.stats.proportion import proportions_ztest
+import altair as alt
+
 st.set_page_config(page_title="COVID-19 Viz – Pregunta 2", layout="wide")
 
 GITHUB_BASE = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports"
@@ -181,29 +183,65 @@ outliers = muertes_pais[z_scores > 3]
 st.write("Outliers detectados (Z > 3):")
 st.dataframe(outliers)
 
+
 # ———————————————————————————————————————————————
-# 2.5 Gráfico de control (3σ) de muertes diarias
+# 2.5 Gráfico de control (3σ) – Muertes diarias globales
 # ———————————————————————————————————————————————
 st.header("2.5 Gráfico de control (3σ) – Muertes diarias globales")
 
-# Sumamos muertes globales por fecha
-fechas = pd.date_range("2020-03-01","2020-05-01") # ejemplo
+# Construimos una serie temporal de muertes totales globales
+# (nota: aquí tomamos solo la fecha seleccionada +/- 30 días como ejemplo)
+rango_fechas = pd.date_range(pd.to_datetime(fecha) - pd.Timedelta(days=30),
+                             pd.to_datetime(fecha))
+
 diario = []
-for f in fechas:
+for f in rango_fechas:
     try:
         df_tmp, _, cols_tmp = load_daily_report(f.strftime("%Y-%m-%d"))
         diario.append([f, df_tmp[cols_tmp["deaths"]].sum()])
     except:
         pass
+
 serie = pd.DataFrame(diario, columns=["Fecha","Muertes"])
 
-media = serie["Muertes"].mean()
-sigma = serie["Muertes"].std()
-ucl = media + 3*sigma
-lcl = max(0, media - 3*sigma)
+if not serie.empty:
+    media = serie["Muertes"].mean()
+    sigma = serie["Muertes"].std()
+    ucl = media + 3*sigma
+    lcl = max(0, media - 3*sigma)
 
-st.line_chart(serie.set_index("Fecha"))
+    # Chart con Altair
+    line = alt.Chart(serie).mark_line(point=True).encode(
+        x=alt.X("Fecha:T", title="Fecha"),
+        y=alt.Y("Muertes:Q", title="Muertes diarias"),
+        tooltip=["Fecha:T","Muertes:Q"]
+    ).properties(
+        width=800, height=400, title="Control Chart (3σ) – Muertes diarias"
+    )
 
-st.write(f"Media: {media:.1f}, UCL (Límite superior 3σ): {ucl:.1f}, LCL: {lcl:.1f}")
+    # Líneas de control
+    reglas = pd.DataFrame({
+        "label": ["Media", "UCL (+3σ)", "LCL (-3σ)"],
+        "valor": [media, ucl, lcl],
+        "color": ["blue", "red", "red"]
+    })
+
+    rules = alt.Chart(reglas).mark_rule(strokeDash=[5,5]).encode(
+        y="valor:Q",
+        color=alt.Color("color:N", scale=None),
+        tooltip=["label:N","valor:Q"]
+    )
+
+    text = alt.Chart(reglas).mark_text(align="left", dx=5).encode(
+        y="valor:Q",
+        text="label:N",
+        color="color:N"
+    )
+
+    st.altair_chart(line + rules + text, use_container_width=True)
+
+    st.write(f"Media: {media:.1f}, UCL (Límite superior 3σ): {ucl:.1f}, LCL: {lcl:.1f}")
+else:
+    st.warning("No se pudo construir la serie de muertes para este rango de fechas.")
 
 
