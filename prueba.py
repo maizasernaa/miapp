@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import StringIO
+import statsmodels
 from statsmodels.stats.proportion import proportions_ztest
 st.set_page_config(page_title="COVID-19 Viz – Pregunta 2", layout="wide")
 
