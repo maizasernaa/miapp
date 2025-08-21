@@ -185,15 +185,19 @@ st.dataframe(outliers)
 
 
 import matplotlib.pyplot as plt
-
 # ———————————————————————————————————————————————
 # 2.5 Gráfico de control (3σ) – Muertes diarias globales
 # ———————————————————————————————————————————————
 st.header("2.5 Gráfico de control (3σ) – Muertes diarias globales")
 
-# Rango de fechas (ejemplo: últimos 30 días respecto a la fecha seleccionada)
-rango_fechas = pd.date_range(pd.to_datetime(fecha) - pd.Timedelta(days=30),
-                             pd.to_datetime(fecha))
+# Filtro: días hacia atrás
+dias = st.sidebar.slider("Rango de días para análisis (2.5)", min_value=7, max_value=90, value=30, step=1)
+
+# Construcción de rango de fechas dinámico
+rango_fechas = pd.date_range(
+    pd.to_datetime(fecha) - pd.Timedelta(days=dias),
+    pd.to_datetime(fecha)
+)
 
 diario = []
 for f in rango_fechas:
@@ -221,7 +225,7 @@ if not serie.empty:
     fuera_control = serie[(serie["Muertes"] > ucl) | (serie["Muertes"] < lcl)]
     ax.scatter(fuera_control["Fecha"], fuera_control["Muertes"], color="red", s=80, zorder=5, label="Anomalías")
 
-    ax.set_title("Gráfico de Control (3σ) de Muertes Diarias", fontsize=14)
+    ax.set_title(f"Gráfico de Control (3σ) – Últimos {dias} días", fontsize=14)
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Muertes")
     ax.legend()
