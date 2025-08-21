@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import StringIO
-
+from statsmodels.stats.proportion import proportions_ztest
 st.set_page_config(page_title="COVID-19 Viz – Pregunta 2", layout="wide")
 
 GITHUB_BASE = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports"
@@ -149,21 +149,24 @@ agg_country["CFR_IC"] = agg_country.apply(lambda row: ci_cfr(row[D], row[C]), ax
 
 st.dataframe(agg_country.head(20))
 
-from statsmodels.stats.proportion import proportions_ztest
-
 st.header("2.3 Test de hipótesis de CFR entre dos países")
 
 paises = st.multiselect("Selecciona dos países", agg_country.index.tolist(), default=["Peru","Chile"])
+
 if len(paises) == 2:
     deaths = [agg_country.loc[p, D] for p in paises]
     confirmed = [agg_country.loc[p, C] for p in paises]
-    
-    stat, pval = proportions_ztest(deaths, confirmed)
-    st.write(f"Estadístico Z: {stat:.3f}, p-valor: {pval:.4f}")
-    if pval < 0.05:
-        st.success("Se rechaza H0: Hay diferencia significativa en CFR.")
+
+    # Evitar división por cero
+    if 0 in confirmed:
+        st.error("Uno de los países seleccionados tiene 0 confirmados. No se puede calcular el test.")
     else:
-        st.info("No se rechaza H0: No hay diferencia significativa en CFR.")
+        stat, pval = proportions_ztest(count=deaths, nobs=confirmed)
+        st.write(f"Estadístico Z: {stat:.3f}, p-valor: {pval:.4f}")
+        if pval < 0.05:
+            st.success("Se rechaza H0: Hay diferencia significativa en CFR.")
+        else:
+            st.info("No se rechaza H0: No hay diferencia significativa en CFR.")
 
 # ———————————————————————————————————————————————
 # 2.4 Detección de outliers
